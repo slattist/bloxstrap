@@ -1,4 +1,6 @@
 ﻿using Bloxstrap.Enums.FlagPresets;
+using System.Security.Policy;
+using System.Windows;
 
 namespace Bloxstrap
 {
@@ -7,15 +9,25 @@ namespace Bloxstrap
         public override string ClassName => nameof(FastFlagManager);
 
         public override string LOG_IDENT_CLASS => ClassName;
-        
+
+        public override string ProfilesLocation => Path.Combine(Paths.Base, "Profiles");
+
         public override string FileLocation => Path.Combine(Paths.Modifications, "ClientSettings\\ClientAppSettings.json");
 
         public bool Changed => !OriginalProp.SequenceEqual(Prop);
 
         public static IReadOnlyDictionary<string, string> PresetFlags = new Dictionary<string, string>
         {
+            // Activity watcher
             { "Network.Log", "FLogNetwork" },
+            { "Players.LogLevel", "FStringDebugLuaLogLevel" },
+            { "Players.LogPattern", "FStringDebugLuaLogPattern" },
 
+            // Debug
+            { "Debug.FlagState", "FStringDebugShowFlagState"},
+            { "Debug.PingBreakdown", "DFFlagDebugPrintDataPingBreakDown" },
+
+            // Presets and stuff
             { "Rendering.Framerate", "DFIntTaskSchedulerTargetFps" },
             { "Rendering.ManualFullscreen", "FFlagHandleAltEnterFullscreenManually" },
             { "Rendering.DisableScaling", "DFFlagDisableDPIScale" },
@@ -23,27 +35,57 @@ namespace Bloxstrap
             { "Rendering.DisablePostFX", "FFlagDisablePostFx" },
             { "Rendering.ShadowIntensity", "FIntRenderShadowIntensity" },
 
+            // Rendering engines
+            { "Rendering.Mode.DisableD3D11", "FFlagDebugGraphicsDisableDirect3D11" },
             { "Rendering.Mode.D3D11", "FFlagDebugGraphicsPreferD3D11" },
+            { "Rendering.Mode.Vulkan", "FFlagDebugGraphicsPreferVulkan" },
+            { "Rendering.Mode.OpenGL", "FFlagDebugGraphicsPreferOpenGL" },
             { "Rendering.Mode.D3D10", "FFlagDebugGraphicsPreferD3D11FL10" },
+            { "Rendering.FixHighlights", "FFlagHighlightOutlinesOnMobile"},
 
+            // Lighting technology
             { "Rendering.Lighting.Voxel", "DFFlagDebugRenderForceTechnologyVoxel" },
             { "Rendering.Lighting.ShadowMap", "FFlagDebugForceFutureIsBrightPhase2" },
             { "Rendering.Lighting.Future", "FFlagDebugForceFutureIsBrightPhase3" },
 
+            // Texture quality
             { "Rendering.TextureQuality.OverrideEnabled", "DFFlagTextureQualityOverrideEnabled" },
             { "Rendering.TextureQuality.Level", "DFIntTextureQualityOverride" },
             { "Rendering.TerrainTextureQuality", "FIntTerrainArraySliceSize" },
 
+            // Guis
             { "UI.Hide", "DFIntCanHideGuiGroupId" },
+            { "UI.Hide.Toggles", "FFlagUserShowGuiHideToggles"},
             { "UI.FontSize", "FIntFontSizePadding" },
 
+            // Telemetry
+            { "Telemetry.EpCounter", "FFlagDebugDisableTelemetryEphemeralCounter"},
+            { "Telemetry.EpStats", "FFlagDebugDisableTelemetryEphemeralStat"},
+            { "Telemetry.Event", "FFlagDebugDisableTelemetryEventIngest"},
+            { "Telemetry.V2Counter", "FFlagDebugDisableTelemetryV2Counter"},
+            { "Telemetry.V2Event", "FFlagDebugDisableTelemetryV2Event"},
+            { "Telemetry.V2Stats", "FFlagDebugDisableTelemetryV2Stat"},
+
+            // Fullscreen bar
             { "UI.FullscreenTitlebarDelay", "FIntFullscreenTitleBarTriggerDelayMillis" },
-            
-            //{ "UI.Menu.Style.V2Rollout", "FIntNewInGameMenuPercentRollout3" },
-            //{ "UI.Menu.Style.EnableV4.1", "FFlagEnableInGameMenuControls" },
-            //{ "UI.Menu.Style.EnableV4.2", "FFlagEnableInGameMenuModernization" },
-            //{ "UI.Menu.Style.EnableV4Chrome", "FFlagEnableInGameMenuChrome" },
-            //{ "UI.Menu.Style.ReportButtonCutOff", "FFlagFixReportButtonCutOff" },
+
+            // useless
+            { "UI.Menu.Style.V2Rollout", "FIntNewInGameMenuPercentRollout3" },
+            { "UI.Menu.Style.EnableV4.1", "FFlagEnableInGameMenuControls" },
+            { "UI.Menu.Style.EnableV4.2", "FFlagEnableInGameMenuModernization" },
+            { "UI.Menu.Style.EnableV4Chrome", "FFlagEnableInGameMenuChrome" },
+            { "UI.Menu.Style.ReportButtonCutOff", "FFlagFixReportButtonCutOff" },
+
+            // Chrome ui
+            { "UI.Menu.ChromeUI", "FFlagEnableInGameMenuChromeABTest4" },
+
+            // Menu stuff
+            { "Menu.VRToggles", "FFlagAlwaysShowVRToggleV3" },
+            { "Menu.Feedback", "FFlagDisableFeedbackSoothsayerCheck" },
+            { "Menu.LanguageSelector", "FIntV1MenuLanguageSelectionFeaturePerMillageRollout" },
+            { "Menu.Haptics", "FFlagAddHapticsToggle" },
+            { "Menu.Framerate", "FFlagGameBasicSettingsFramerateCap5"},
+            { "Menu.ChatTranslation", "FFlagChatTranslationSettingEnabled3" }
 
 
             //{ "UI.Menu.Style.ABTest.1", "FFlagEnableMenuControlsABTest" },
@@ -55,6 +97,8 @@ namespace Bloxstrap
         public static IReadOnlyDictionary<RenderingMode, string> RenderingModes => new Dictionary<RenderingMode, string>
         {
             { RenderingMode.Default, "None" },
+            { RenderingMode.Vulkan, "Vulkan" },
+            { RenderingMode.OpenGL, "OpenGL" },
             { RenderingMode.D3D11, "D3D11" },
             { RenderingMode.D3D10, "D3D10" },
         };
@@ -258,6 +302,29 @@ namespace Bloxstrap
 
             if (GetPreset("Rendering.ManualFullscreen") != "False")
                 SetPreset("Rendering.ManualFullscreen", "False");
+
+            if (GetPreset("Rendering.FixHighlights") != "True")
+                SetPreset("Rendering.FixHighlights", "True");
+        }
+
+        public void DeleteProfile(string Profile)
+        {
+            try
+            {
+                string profilesDirectory = Path.Combine(Paths.Base, Paths.SavedFlagProfiles);
+
+                if (!Directory.Exists(profilesDirectory))
+                    Directory.CreateDirectory(profilesDirectory);
+
+                if (String.IsNullOrEmpty(Profile))
+                    return;
+
+                File.Delete(Path.Combine(profilesDirectory, Profile));
+            }
+            catch (Exception ex)
+            {
+                Frontend.ShowMessageBox(ex.Message, MessageBoxImage.Error);
+            }
         }
     }
 }

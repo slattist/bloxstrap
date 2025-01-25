@@ -73,8 +73,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             if (!CanContinue)
                 return;
-
-            App.State.Prop.ShowFFlagEditorWarning = false;
             App.State.Save(); // should we be force saving here?
 
             if (Window.GetWindow(_page) is INavigationWindow window)

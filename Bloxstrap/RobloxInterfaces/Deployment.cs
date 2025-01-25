@@ -1,4 +1,9 @@
-﻿namespace Bloxstrap.RobloxInterfaces
+﻿using Bloxstrap.Properties;
+using System;
+using System.Configuration;
+using System.Windows.Automation;
+
+namespace Bloxstrap.RobloxInterfaces
 {
     public static class Deployment
     {
@@ -6,7 +11,8 @@
         
         private const string VersionStudioHash = "version-012732894899482c";
 
-        public static string Channel = DefaultChannel;
+
+        public static string Channel = App.Settings.Prop.Channel;
 
         public static string BinaryType = "WindowsPlayer";
 
@@ -135,7 +141,7 @@
             return location;
         }
 
-        public static async Task<ClientVersion> GetInfo(string? channel = null)
+        public static async Task<ClientVersion> GetInfo(bool? isUpgrade = false, string ? channel = null)
         {
             const string LOG_IDENT = "Deployment::GetInfo";
 
@@ -185,15 +191,6 @@
                     {
                         throw new InvalidChannelException(httpEx.StatusCode);
                     }
-                }
-
-                // check if channel is behind LIVE
-                if (!isDefaultChannel)
-                {
-                    var defaultClientVersion = await GetInfo(DefaultChannel);
-
-                    if (Utilities.CompareVersions(clientVersion.Version, defaultClientVersion.Version) == VersionComparison.LessThan)
-                        clientVersion.IsBehindDefaultChannel = true;
                 }
 
                 ClientVersionCache[cacheKey] = clientVersion;

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using System.CodeDom;
 
 namespace Bloxstrap.Utility
 {
@@ -106,6 +107,24 @@ namespace Bloxstrap.Utility
 
             if (uriKey.GetValue("") as string != RobloxPlaceKey)
                 uriKey.SetValueSafe("", RobloxPlaceKey);
+        }
+
+        public static void RegisterApis()
+        {
+            static void Register()
+            {
+                using var apisKey = Registry.CurrentUser.CreateSubKey(App.ApisKey);
+                apisKey.SetValueSafe("ApplicationPath", Paths.Application);
+                apisKey.SetValueSafe("InstallationPath", Paths.Base);
+            };
+
+            var currentApis = Registry.CurrentUser.OpenSubKey(App.ApisKey,false);
+
+            if (currentApis == null)
+            {
+                Register();
+            };
+            currentApis?.Dispose();
         }
 
         public static void Unregister(string key)

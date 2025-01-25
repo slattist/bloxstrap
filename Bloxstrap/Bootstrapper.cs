@@ -1,4 +1,4 @@
-﻿// To debug the automatic updater:
+// To debug the automatic updater:
 // - Uncomment the definition below
 // - Publish the executable
 // - Launch the executable (click no when it asks you to upgrade)
@@ -65,6 +65,8 @@ namespace Bloxstrap
         private AsyncMutex? _mutex;
 
         private int _appPid = 0;
+
+        private int totalPackageSize = 0;
 
         public IBootstrapperDialog? Dialog = null;
 
@@ -267,8 +269,8 @@ namespace Bloxstrap
             using var key = Registry.CurrentUser.CreateSubKey($"SOFTWARE\\ROBLOX Corporation\\Environments\\{AppData.RegistryName}\\Channel");
 
             var match = Regex.Match(
-                App.LaunchSettings.RobloxLaunchArgs, 
-                "channel:([a-zA-Z0-9-_]+)", 
+                App.LaunchSettings.RobloxLaunchArgs,
+                "channel:([a-zA-Z0-9-_]+)",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
             );
 
@@ -408,7 +410,7 @@ namespace Bloxstrap
             if (String.IsNullOrEmpty(logFileName))
             {
                 App.Logger.WriteLine(LOG_IDENT, "Unable to identify log file");
-                Frontend.ShowPlayerErrorDialog();
+               // Frontend.ShowPlayerErrorDialog();
                 return;
             }
             else
@@ -470,7 +472,7 @@ namespace Bloxstrap
                 if (App.LaunchSettings.TestModeFlag.Active)
                     args += " -testmode";
 
-                if (ipl.IsAcquired)
+                if (ipl.IsAcquired||true)
                     Process.Start(Paths.Process, args);
             }
 
@@ -649,6 +651,7 @@ namespace Bloxstrap
         #endregion
 
         #region Roblox Install
+
         private void CleanupVersionsFolder()
         {
             const string LOG_IDENT = "Bootstrapper::CleanupVersionsFolder";
@@ -663,7 +666,7 @@ namespace Bloxstrap
                     {
                         Directory.Delete(dir, true);
                     }
-                    catch (Exception ex)
+                    catch (IOException ex)
                     {
                         App.Logger.WriteLine(LOG_IDENT, $"Failed to delete {dir}");
                         App.Logger.WriteException(LOG_IDENT, ex);
@@ -713,9 +716,29 @@ namespace Bloxstrap
             }
         }
 
+
         private async Task UpgradeRoblox()
         {
             const string LOG_IDENT = "Bootstrapper::UpgradeRoblox";
+
+            bool CancelUpgrade = !App.Settings.Prop.UpdateRoblox;
+
+            if (CancelUpgrade)
+            {
+                SetStatus(Strings.Bootstrapper_Status_CancelUpgrade);
+                App.Logger.WriteLine(LOG_IDENT, "Upgrading disabled, cancelling the upgrade.");
+                Thread.Sleep(2000);
+            }
+
+            if (CancelUpgrade && !Directory.Exists(_latestVersionDirectory) && false)
+            {
+                Frontend.ShowMessageBox(Strings.Bootstrapper_Dialog_NoUpgradeWithoutClient, MessageBoxImage.Error, MessageBoxButton.OK);
+                App.Terminate();
+            }
+            else if (CancelUpgrade)
+            {
+                return;
+            }
 
             if (String.IsNullOrEmpty(AppData.State.VersionGuid))
                 SetStatus(Strings.Bootstrapper_Status_Installing);
@@ -756,7 +779,7 @@ namespace Bloxstrap
             // packed size only matters if we don't already have the package cached on disk
             totalSizeRequired += _versionPackageManifest.Where(x => !cachedPackageHashes.Contains(x.Signature)).Sum(x => x.PackedSize);
             totalSizeRequired += _versionPackageManifest.Sum(x => x.Size);
-            
+
             if (Filesystem.GetFreeDiskSpace(Paths.Base) < totalSizeRequired)
             {
                 Frontend.ShowMessageBox(Strings.Bootstrapper_NotEnoughSpace, MessageBoxImage.Error);
@@ -787,6 +810,14 @@ namespace Bloxstrap
 
             foreach (var package in _versionPackageManifest)
             {
+                if (package.Name == "WebView2RuntimeInstaller.zip")
+                    continue;
+
+                totalPackageSize += package.Size;
+            }
+
+            foreach (var package in _versionPackageManifest)
+            {
                 if (_cancelTokenSource.IsCancellationRequested)
                     return;
 
@@ -812,7 +843,7 @@ namespace Bloxstrap
             }
 
             await Task.WhenAll(extractionTasks);
-            
+
             App.Logger.WriteLine(LOG_IDENT, "Writing AppSettings.xml...");
             await File.WriteAllTextAsync(Path.Combine(_latestVersionDirectory, "AppSettings.xml"), AppSettings);
 
@@ -828,7 +859,7 @@ namespace Bloxstrap
                 {
                     // reset prompt state if the user has it installed
                     App.State.Prop.PromptWebView2Install = true;
-                }   
+                }
                 else
                 {
                     var result = Frontend.ShowMessageBox(Strings.Bootstrapper_WebView2NotFound, MessageBoxImage.Warning, MessageBoxButton.YesNo, MessageBoxResult.Yes);
@@ -894,7 +925,7 @@ namespace Bloxstrap
                 if (!allPackageHashes.Contains(hash))
                 {
                     App.Logger.WriteLine(LOG_IDENT, $"Deleting unused package {hash}");
-                        
+
                     try
                     {
                         File.Delete(Path.Combine(Paths.Downloads, hash));
@@ -1098,6 +1129,34 @@ namespace Bloxstrap
             App.State.Prop.ModManifest = modFolderFiles;
             App.State.Save();
 
+            App.Logger.WriteLine(LOG_IDENT,"Checking for eurotrucks2.exe toggle");
+
+            try
+            {
+                bool isEuroTrucks = File.Exists(Path.Combine(_latestVersionDirectory, "eurotrucks2.exe")) ? true : false;
+
+                if (App.Settings.Prop.RenameClientToEuroTrucks2)
+                {
+                    if (!isEuroTrucks)
+                        File.Move(
+                            Path.Combine(_latestVersionDirectory, "RobloxPlayerBeta.exe"),
+                            Path.Combine(_latestVersionDirectory, "eurotrucks2.exe")
+                        );
+                }
+                else
+                {
+                    if (isEuroTrucks)
+                        File.Move(
+                            Path.Combine(_latestVersionDirectory, "eurotrucks2.exe"),
+                            Path.Combine(_latestVersionDirectory, "RobloxPlayerBeta.exe")
+                        );
+                }
+            } 
+            catch (Exception ex)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Failed to update client! " + ex.Message);
+            }
+
             App.Logger.WriteLine(LOG_IDENT, $"Finished checking file mods");
         }
 
@@ -1189,6 +1248,12 @@ namespace Bloxstrap
                         await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), _cancelTokenSource.Token);
 
                         _totalDownloadedBytes += bytesRead;
+                        SetStatus(
+                            String.Format(App.Settings.Prop.DownloadingStringFormat, 
+                            package.Name, 
+                            _totalDownloadedBytes / 1048576,
+                            totalPackageSize / 1048576
+                            ));
                         UpdateProgressBar();
                     }
 
@@ -1207,8 +1272,6 @@ namespace Bloxstrap
 
                     if (ex.GetType() == typeof(ChecksumFailedException))
                     {
-                        App.SendStat("packageDownloadState", "httpFail");
-
                         Frontend.ShowConnectivityDialog(
                             Strings.Dialog_Connectivity_UnableToDownload,
                             String.Format(Strings.Dialog_Connectivity_UnableToDownloadReason, "[https://github.com/bloxstraplabs/bloxstrap/wiki/Bloxstrap-is-unable-to-download-Roblox](https://github.com/bloxstraplabs/bloxstrap/wiki/Bloxstrap-is-unable-to-download-Roblox)"),

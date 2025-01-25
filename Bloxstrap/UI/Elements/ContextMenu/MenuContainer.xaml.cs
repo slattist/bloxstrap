@@ -25,6 +25,10 @@ namespace Bloxstrap.UI.Elements.ContextMenu
 
         private ServerHistory? _gameHistoryWindow;
 
+        private OutputConsole? _OutputConsole;
+
+        private ChatLogs? _ChatLogs;
+
         public MenuContainer(Watcher watcher)
         {
             InitializeComponent();
@@ -74,6 +78,12 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                     InviteDeeplinkMenuItem.Visibility = Visibility.Visible;
 
                 ServerDetailsMenuItem.Visibility = Visibility.Visible;
+
+                if (App.FastFlags.GetPreset("Players.LogLevel") == "trace")
+                {
+                    OutputConsoleMenuItem.Visibility = Visibility.Visible;
+                    ChatLogsMenuItem.Visibility = Visibility.Visible;
+                }
             });
         }
 
@@ -82,6 +92,15 @@ namespace Bloxstrap.UI.Elements.ContextMenu
             Dispatcher.Invoke(() => {
                 InviteDeeplinkMenuItem.Visibility = Visibility.Collapsed;
                 ServerDetailsMenuItem.Visibility = Visibility.Collapsed;
+
+                if (App.FastFlags.GetPreset("Players.LogLevel") == "trace")
+                {
+                    OutputConsoleMenuItem.Visibility = Visibility.Collapsed;
+                    ChatLogsMenuItem.Visibility = Visibility.Collapsed;
+
+                    _ChatLogs?.Close();
+                    _OutputConsole?.Close();
+                }
 
                 _serverInformationWindow?.Close();
             });
@@ -145,6 +164,40 @@ namespace Bloxstrap.UI.Elements.ContextMenu
                 _gameHistoryWindow.ShowDialog();
             else
                 _gameHistoryWindow.Activate();
+        }
+
+        private void OutputConsoleMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activityWatcher is null)
+                throw new ArgumentNullException(nameof(_activityWatcher));
+
+            if (_OutputConsole is null)
+            {
+                _OutputConsole = new(_activityWatcher);
+                _OutputConsole.Closed += (_, _) => _OutputConsole = null;
+            }
+
+            if (!_OutputConsole.IsVisible)
+                _OutputConsole.ShowDialog();
+            else
+                _OutputConsole.Activate();
+        }
+
+        private void ChatLogsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activityWatcher is null)
+                throw new ArgumentNullException(nameof(_activityWatcher));
+
+            if (_ChatLogs is null)
+            {
+                _ChatLogs = new(_activityWatcher);
+                _ChatLogs.Closed += (_, _) => _ChatLogs = null;
+            }
+
+            if (!_ChatLogs.IsVisible)
+                _ChatLogs.ShowDialog();
+            else
+                _ChatLogs.Activate();
         }
     }
 }

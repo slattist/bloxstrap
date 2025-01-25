@@ -79,6 +79,8 @@ namespace Bloxstrap
                 uninstallKey.SetValueSafe("URLUpdateInfo", App.ProjectDownloadLink);
             }
 
+            WindowsRegistry.RegisterApis();
+
             // only register player, for the scenario where the user installs bloxstrap, closes it,
             // and then launches from the website expecting it to work
             // studio can be implicitly registered when it's first launched manually
@@ -104,8 +106,6 @@ namespace Bloxstrap
 
             App.Logger.WriteLine(LOG_IDENT, "Installation finished");
 
-            if (!IsImplicitInstall)
-                App.SendStat("installAction", "install");
         }
 
         private bool ValidateLocation()
@@ -250,7 +250,7 @@ namespace Bloxstrap
             }
             else
             {
-                string playerPath = Path.Combine((string)playerFolder, "RobloxPlayerBeta.exe");
+                string playerPath = Path.Combine((string)playerFolder, App.Settings.Prop.RenameClientToEuroTrucks2 ? "eurotrucks2.exe" : "RobloxPlayerBeta.exe");
 
                 WindowsRegistry.RegisterPlayer(playerPath, "%1");
             }
@@ -278,6 +278,8 @@ namespace Bloxstrap
                 WindowsRegistry.RegisterStudioFileClass(studioPath, "-ide \"%1\"");
             }
 
+            Registry.CurrentUser.DeleteSubKey(App.ApisKey);
+
             var cleanupSequence = new List<Action>
             {
                 () =>
@@ -294,10 +296,18 @@ namespace Bloxstrap
                 () => File.Delete(StartMenuShortcut),
 
                 () => Directory.Delete(Paths.Versions, true),
+
                 () => Directory.Delete(Paths.Downloads, true),
 
-                () => File.Delete(App.State.FileLocation)
+                () => File.Delete(App.State.FileLocation),
+
+                () =>
+                {
+                if (Paths.Roblox == Path.Combine(Paths.Base, "Roblox")) // checking if roblox is installed in base directory
+                    Directory.Delete(Paths.Roblox, true);               // made that to prevent accidental removals of different builds
+                }
             };
+
 
             if (!keepData)
             {
@@ -352,8 +362,6 @@ namespace Bloxstrap
                     WindowStyle = ProcessWindowStyle.Hidden
                 });
             }
-
-            App.SendStat("installAction", "uninstall");
         }
 
         public static void HandleUpgrade()
@@ -601,8 +609,6 @@ namespace Bloxstrap
 
             if (currentVer is null)
                 return;
-
-            App.SendStat("installAction", "upgrade");
 
             if (isAutoUpgrade)
             {

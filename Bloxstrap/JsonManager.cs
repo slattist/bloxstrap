@@ -1,14 +1,18 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Xml.Linq;
 
 namespace Bloxstrap
 {
     public class JsonManager<T> where T : class, new()
     {
         public T OriginalProp { get; set; } = new();
-        
+
         public T Prop { get; set; } = new();
 
         public virtual string ClassName => typeof(T).Name;
+        
+        public virtual string ProfilesLocation => Path.Combine(Paths.Base, $"Profiles.json");
 
         public virtual string FileLocation => Path.Combine(Paths.Base, $"{ClassName}.json");
 
@@ -16,6 +20,7 @@ namespace Bloxstrap
 
         public virtual void Load(bool alertFailure = true)
         {
+            
             string LOG_IDENT = $"{LOG_IDENT_CLASS}::Load";
 
             App.Logger.WriteLine(LOG_IDENT, $"Loading from {FileLocation}...");
@@ -88,6 +93,96 @@ namespace Bloxstrap
             }
 
             App.Logger.WriteLine(LOG_IDENT, "Save complete!");
+        }
+
+        public void SaveProfile(string name)
+        {
+            string LOGGER_STRING = "SaveProfile::Profiles";
+
+            string BaseDir = Paths.SavedFlagProfiles;
+            try
+            {
+                string FileDirectory = Path.Combine(BaseDir, name);
+
+                if (string.IsNullOrEmpty(name))
+                    return;
+
+                if (!Directory.Exists(BaseDir))
+                    Directory.CreateDirectory(BaseDir);
+
+                App.Logger.WriteLine(LOGGER_STRING, $"Writing flag profile {name}");
+
+                if (!File.Exists(FileDirectory))
+                    File.Create(FileDirectory).Dispose();
+
+                string FastFlagsJson = JsonSerializer.Serialize(Prop, new JsonSerializerOptions { WriteIndented = true });
+
+                File.WriteAllText(FileDirectory, FastFlagsJson);
+            }
+            catch (Exception ex)
+            {
+                Frontend.ShowMessageBox(ex.Message, MessageBoxImage.Error);
+            }
+        }
+
+        public void LoadProfile(string? name, bool? clearFlags)
+        {
+            string LOGGER_STRING = "LoadProfile::Profiles";
+
+            string BaseDir = Paths.SavedFlagProfiles;
+
+            if (string.IsNullOrEmpty(name))
+                return;
+
+
+            try
+            {
+                if (!Directory.Exists(BaseDir))
+                    Directory.CreateDirectory(BaseDir);
+
+                string[] Files = Directory.GetFiles(BaseDir);
+
+                string FoundFile = string.Empty;
+
+                foreach (var file in Files)
+                {
+                    if (Path.GetFileName(file) == name)
+                    {
+                        FoundFile = file;
+                        break;
+                    }
+                }
+
+                string SavedClientSettings = File.ReadAllText(FoundFile);
+
+                App.Logger.WriteLine(LOGGER_STRING, $"Loading {SavedClientSettings}");
+
+                T? settings = JsonSerializer.Deserialize<T>(SavedClientSettings);
+
+                if (settings is null)
+                    throw new ArgumentNullException("Deserialization returned null");
+
+                if (clearFlags == true)
+                {
+                    Prop = settings;
+                }
+                else
+                {
+                    if (settings is IDictionary<string, object> settingsDict && Prop is IDictionary<string, object> propDict)
+                    {
+                        foreach (var kvp in settingsDict)
+                        {
+                            if (kvp.Value != null)
+                                propDict[kvp.Key] = kvp.Value;
+                        }
+                    }
+                }
+
+                App.FastFlags.Save();
+            } catch (Exception ex)
+            {
+                Frontend.ShowMessageBox(ex.Message,MessageBoxImage.Error);
+            }
         }
     }
 }

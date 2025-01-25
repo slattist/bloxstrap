@@ -63,6 +63,11 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, $"Opening bootstrapper ({App.LaunchSettings.RobloxLaunchMode})");
                 LaunchRoblox(App.LaunchSettings.RobloxLaunchMode);
             }
+            else if (App.LaunchSettings.BloxshadeFlag.Active)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Opening Bloxshade");
+                LaunchBloxshadeConfig();
+            }
             else if (!App.LaunchSettings.QuietFlag.Active)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Opening menu");
@@ -204,6 +209,8 @@ namespace Bloxstrap
         {
             const string LOG_IDENT = "LaunchHandler::LaunchRoblox";
 
+            const string MutexName = "ROBLOX_singletonMutex";
+
             if (launchMode == LaunchMode.None)
                 throw new InvalidOperationException("No Roblox launch mode set");
 
@@ -217,7 +224,7 @@ namespace Bloxstrap
                 App.Terminate(ErrorCode.ERROR_FILE_NOT_FOUND);
             }
 
-            if (App.Settings.Prop.ConfirmLaunches && Mutex.TryOpenExisting("ROBLOX_singletonMutex", out var _))
+            if (App.Settings.Prop.ConfirmLaunches && Mutex.TryOpenExisting("ROBLOX_singletonMutex", out var _) && !App.Settings.Prop.MultiInstanceLaunching)
             {
                 // this currently doesn't work very well since it relies on checking the existence of the singleton mutex
                 // which often hangs around for a few seconds after the window closes
@@ -245,6 +252,22 @@ namespace Bloxstrap
                 dialog.Bootstrapper = App.Bootstrapper;
             }
 
+            App.Logger.WriteLine(LOG_IDENT, $"Creating {MutexName}");
+
+            Mutex? mutex = null;
+            if (App.Settings.Prop.MultiInstanceLaunching)
+            {
+                try
+                {
+                    mutex = new Mutex(true, MutexName);
+                    App.Logger.WriteLine(LOG_IDENT, $"Created {MutexName}");
+                }
+                catch
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Failed to create {MutexName}");
+                }
+            }
+
             Task.Run(App.Bootstrapper.Run).ContinueWith(t =>
             {
                 App.Logger.WriteLine(LOG_IDENT, "Bootstrapper task has finished");
@@ -256,6 +279,20 @@ namespace Bloxstrap
                     if (t.Exception is not null)
                         App.FinalizeExceptionHandling(t.Exception);
                 }
+                if (mutex != null) {
+                    // get process name
+                    string ProcessName = "RobloxPlayerBeta";
+                    if (App.Settings.Prop.RenameClientToEuroTrucks2)
+                        ProcessName = "eurotrucks2"; // ansel supports
+                    App.Logger.WriteLine(LOG_IDENT, $"Resolved Roblox name \"{ProcessName}\".exe, running Fishstrap in background.");
+
+                    // now yield until the processes are closed
+                    while (Process.GetProcessesByName(ProcessName).Any())
+                        Thread.Sleep(5000);
+
+                    App.Logger.WriteLine(LOG_IDENT,"Every Roblox instance is closed, terminating the process");
+                }
+
 
                 App.Terminate();
             });
@@ -294,6 +331,23 @@ namespace Bloxstrap
 
                 App.Terminate();
             });
+        }
+
+        public static void LaunchBloxshadeConfig()
+        {
+            const string LOG_IDENT = "LaunchHandler::LaunchBloxshade";
+
+            // ansel setting
+            App.Settings.Prop.RenameClientToEuroTrucks2 = true;
+            App.Settings.Save();
+
+            App.State.Prop.ShowBloxshadeWarning = true;
+            App.State.Save();
+
+            App.Logger.WriteLine(LOG_IDENT, "Ansel setting has been set to true");
+
+            new BloxshadeDialog().ShowDialog();
+            App.SoftTerminate();
         }
     }
 }

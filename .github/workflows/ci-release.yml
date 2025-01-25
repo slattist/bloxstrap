@@ -5,9 +5,6 @@ jobs:
   build:
     runs-on: windows-latest
 
-    outputs:
-      artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
-
     steps:
     - uses: actions/checkout@v4
       with:
@@ -27,10 +24,9 @@ jobs:
       run: dotnet publish -p:PublishSingleFile=true -p:CommitHash=${{ github.sha }} -p:CommitRef=${{ github.ref_type }}/${{ github.ref_name }} -r win-x64 -c Release --self-contained false .\Bloxstrap\Bloxstrap.csproj
 
     - name: Upload Artifact
-      id: upload-artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Bloxstrap (Release) (${{ github.sha }})
+        name: Fishstrap (Release) (${{ github.sha }})
         path: .\Bloxstrap\bin\Release\net6.0-windows\win-x64\publish\*
 
   release:
@@ -39,27 +35,21 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - name: Sign and download artifact
-        uses: signpath/github-action-submit-signing-request@v1.1
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '107b3de5-057b-42fc-a985-3546e4261775'
-          project-slug: 'bloxstrap'
-          signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'github-ci'
-          github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: 'release'
+          name: Fishstrap (Release) (${{ github.sha }})
+          path: release
 
       - name: Rename binaries
-        run: mv release/Bloxstrap.exe Bloxstrap-${{ github.ref_name }}.exe
+        run: mv release/Bloxstrap.exe Fishstrap-${{ github.ref_name }}.exe
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: Bloxstrap-${{ github.ref_name }}.exe
-          name: Bloxstrap ${{ github.ref_name }}
+          files: Fishstrap-${{ github.ref_name }}.exe
+          name: Fishstrap ${{ github.ref_name }}
 
   release-test:
     needs: build
@@ -67,24 +57,18 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/release-test')
 
     steps:
-      - name: Sign and download artifact
-        uses: signpath/github-action-submit-signing-request@v1.1
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '107b3de5-057b-42fc-a985-3546e4261775'
-          project-slug: 'bloxstrap'
-          signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'github-ci'
-          github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
-          wait-for-completion: true
-          output-artifact-directory: 'release'
+          name: Fishstrap (Release) (${{ github.sha }})
+          path: release
 
       - name: Rename binaries
-        run: mv release/Bloxstrap.exe Bloxstrap-${{ github.ref_name }}.exe
+        run: mv release/Bloxstrap.exe Fishstrap-${{ github.ref_name }}.exe
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: Bloxstrap-${{ github.ref_name }}.exe
-          name: Bloxstrap ${{ github.ref_name }}
+          files: Fishstrap-${{ github.ref_name }}.exe
+          name: Fishstrap ${{ github.ref_name }}

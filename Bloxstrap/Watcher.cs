@@ -20,6 +20,7 @@ namespace Bloxstrap
         {
             const string LOG_IDENT = "Watcher";
 
+
             if (!_lock.IsAcquired)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Watcher instance already exists");
@@ -61,8 +62,11 @@ namespace Bloxstrap
                     };
                 }
 
-                if (App.Settings.Prop.UseDiscordRichPresence)
+                if (App.Settings.Prop.UseDiscordRichPresence && !App.State.Prop.WatcherRunning)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Running rpc");
                     RichPresence = new(ActivityWatcher);
+                }
             }
 
             _notifyIcon = new(this);
@@ -124,6 +128,8 @@ namespace Bloxstrap
 
             _notifyIcon?.Dispose();
             RichPresence?.Dispose();
+
+            App.State.Prop.WatcherRunning = false;
 
             GC.SuppressFinalize(this);
         }

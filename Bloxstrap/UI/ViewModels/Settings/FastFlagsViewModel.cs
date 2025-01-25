@@ -3,6 +3,8 @@
 using CommunityToolkit.Mvvm.Input;
 
 using Bloxstrap.Enums.FlagPresets;
+using Bloxstrap.UI.Elements.Settings.Pages;
+using Wpf.Ui.Mvvm.Contracts;
 
 namespace Bloxstrap.UI.ViewModels.Settings
 {
@@ -17,6 +19,27 @@ namespace Bloxstrap.UI.ViewModels.Settings
         private void OpenFastFlagEditor() => OpenFlagEditorEvent?.Invoke(this, EventArgs.Empty);
 
         public ICommand OpenFastFlagEditorCommand => new RelayCommand(OpenFastFlagEditor);
+
+        public bool DisableTelemetry
+        {
+            get => App.FastFlags.GetPreset("Telemetry.EpCounter") == "True"; // we use this fflag to determine if preset is enabled
+            set
+            {
+                // is there a better way of doing that?
+                App.FastFlags.SetPreset("Telemetry.EpCounter", value ? "True" : null);
+                App.FastFlags.SetPreset("Telemetry.EpStats", value ? "True" : null);
+                App.FastFlags.SetPreset("Telemetry.Event", value ? "True" : null);
+                App.FastFlags.SetPreset("Telemetry.V2Counter", value ? "True" : null);
+                App.FastFlags.SetPreset("Telemetry.V2Event", value ? "True" : null);
+                App.FastFlags.SetPreset("Telemetry.V2Stats", value ? "True" : null);
+            }
+        }
+
+        public bool PingBreakdown
+        {
+            get => App.FastFlags.GetPreset("Debug.PingBreakdown") == "True";
+            set => App.FastFlags.SetPreset("Debug.PingBreakdown", value ? "True" : null);
+        }
 
         public bool UseFastFlagManager
         {
@@ -43,13 +66,29 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public RenderingMode SelectedRenderingMode
         {
             get => App.FastFlags.GetPresetEnum(RenderingModes, "Rendering.Mode", "True");
-            set => App.FastFlags.SetPresetEnum("Rendering.Mode", RenderingModes[value], "True");
+            set
+            {
+                RenderingMode[] DisableD3D11 = new RenderingMode[]
+                {
+                    RenderingMode.Vulkan,
+                    RenderingMode.OpenGL
+                };
+
+                App.FastFlags.SetPresetEnum("Rendering.Mode", value.ToString(), "True");
+                App.FastFlags.SetPreset("Rendering.Mode.DisableD3D11", DisableD3D11.Contains(value) ? "True" : null);
+            }
         }
 
         public bool FixDisplayScaling
         {
             get => App.FastFlags.GetPreset("Rendering.DisableScaling") == "True";
             set => App.FastFlags.SetPreset("Rendering.DisableScaling", value ? "True" : null);
+        }
+
+        public string? FlagState
+        {
+            get => App.FastFlags.GetPreset("Debug.FlagState");
+            set => App.FastFlags.SetPreset("Debug.FlagState", value);
         }
 
         //public IReadOnlyDictionary<InGameMenuVersion, Dictionary<string, string?>> IGMenuVersions => FastFlagManager.IGMenuVersions;
@@ -100,10 +139,19 @@ namespace Bloxstrap.UI.ViewModels.Settings
             set => App.FastFlags.SetPreset("UI.FullscreenTitlebarDelay", value ? "3600000" : null);
         }
 
-        public bool GuiHidingEnabled
+        public int GuiHidingId
         {
-            get => App.FastFlags.GetPreset("UI.Hide") == "32380007";
-            set => App.FastFlags.SetPreset("UI.Hide", value ? "32380007" : null);
+            get => int.TryParse(App.FastFlags.GetPreset("UI.Hide"), out int x) ? x : 0;
+            set {
+                App.FastFlags.SetPreset("UI.Hide", value == 0 ? null : value);
+                if (value != 0)
+                {
+                    App.FastFlags.SetPreset("UI.Hide.Toggles", true);
+                } else
+                {
+                    App.FastFlags.SetPreset("UI.Hide.Toggles", null);
+                }
+            }
         }
 
         public IReadOnlyDictionary<TextureQuality, string?> TextureQualities => FastFlagManager.TextureQualityLevels;
@@ -149,7 +197,47 @@ namespace Bloxstrap.UI.ViewModels.Settings
             set => App.FastFlags.SetPreset("Rendering.TerrainTextureQuality", value ? "0" : null);
         }
 
+        public bool ChromeUI
+        {
+            get => App.FastFlags.GetPreset("UI.Menu.ChromeUI") != "False"; // its on by default so we have to do that
+            set => App.FastFlags.SetPreset("UI.Menu.ChromeUI", value);
+        }
 
+        public bool VRToggle
+        {
+            get => App.FastFlags.GetPreset("Menu.VRToggles") != "False";
+            set => App.FastFlags.SetPreset("Menu.VRToggles", value);
+        }
+
+        public bool SoothsayerCheck
+        {
+            get => App.FastFlags.GetPreset("Menu.Feedback") != "False";
+            set => App.FastFlags.SetPreset("Menu.Feedback", value);
+        }
+
+        public bool LanguageSelector
+        {
+            get => App.FastFlags.GetPreset("Menu.LanguageSelector") != "0";
+            set => App.FastFlags.SetPreset("Menu.LanguageSelector", value ? null : "0");
+        }
+
+        public bool Haptics
+        {
+            get => App.FastFlags.GetPreset("Menu.Haptics") != "False";
+            set => App.FastFlags.SetPreset("Menu.Haptics", value);
+        }
+
+        public bool Framerate
+        {
+            get => App.FastFlags.GetPreset("Menu.Framerate") != "False";
+            set => App.FastFlags.SetPreset("Menu.Framerate", value);
+        }
+
+        public bool ChatTranslation
+        {
+            get => App.FastFlags.GetPreset("Menu.ChatTranslation") != "False";
+            set => App.FastFlags.SetPreset("Menu.ChatTranslation", value);
+        }
         public bool ResetConfiguration
         {
             get => _preResetFlags is not null;

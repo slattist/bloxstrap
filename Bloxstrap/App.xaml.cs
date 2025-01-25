@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Shell;
@@ -14,15 +14,15 @@ namespace Bloxstrap
     public partial class App : Application
     {
 #if QA_BUILD
-        public const string ProjectName = "Bloxstrap-QA";
+        public const string ProjectName = "Fishstrap-QA";
 #else
-        public const string ProjectName = "Bloxstrap";
+        public const string ProjectName = "Fishstrap";
 #endif
-        public const string ProjectOwner = "Bloxstrap";
-        public const string ProjectRepository = "bloxstraplabs/bloxstrap";
-        public const string ProjectDownloadLink = "https://bloxstraplabs.com";
+        public const string ProjectOwner = "returnrqt";
+        public const string ProjectRepository = "returnrqt/fishstrap";
+        public const string ProjectDownloadLink = "https://github.com/returnrqt/fishstrap/releases";
         public const string ProjectHelpLink = "https://github.com/bloxstraplabs/bloxstrap/wiki";
-        public const string ProjectSupportLink = "https://github.com/bloxstraplabs/bloxstrap/issues/new";
+        public const string ProjectSupportLink = "https://github.com/returnrqt/fishstrap/issues/new";
 
         public const string RobloxPlayerAppName = "RobloxPlayerBeta";
         public const string RobloxStudioAppName = "RobloxStudioBeta";
@@ -30,11 +30,13 @@ namespace Bloxstrap
         // simple shorthand for extremely frequently used and long string - this goes under HKCU
         public const string UninstallKey = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{ProjectName}";
 
+        public const string ApisKey = $"Software\\{ProjectName}";
+
         public static LaunchSettings LaunchSettings { get; private set; } = null!;
 
         public static BuildMetadataAttribute BuildMetadata = Assembly.GetExecutingAssembly().GetCustomAttribute<BuildMetadataAttribute>()!;
 
-        public static string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString()[..^2];
+        public static string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString();
 
         public static Bootstrapper? Bootstrapper { get; set; } = null!;
 
@@ -147,40 +149,15 @@ namespace Bloxstrap
 
             return null;
         }
-
-        public static async void SendStat(string key, string value)
+        public static void SendStat(string key, string value)
         {
-            if (!Settings.Prop.EnableAnalytics)
-                return;
-
-            try
-            {
-                await HttpClient.GetAsync($"https://bloxstraplabs.com/metrics/post?key={key}&value={value}");
-            }
-            catch (Exception ex)
-            {
-                Logger.WriteException("App::SendStat", ex);
-            }
+            
         }
 
-        public static async void SendLog()
+        public static void SendLog()
         {
-            if (!Settings.Prop.EnableAnalytics || !IsProductionBuild)
-                return;
-
-            try
-            {
-                await HttpClient.PostAsync(
-                    $"https://bloxstraplabs.com/metrics/post-exception", 
-                    new StringContent(Logger.AsDocument)
-                );
-            }
-            catch (Exception ex)
-            {
-                Logger.WriteException("App::SendLog", ex);
-            }
+            
         }
-
         protected override void OnStartup(StartupEventArgs e)
         {
             const string LOG_IDENT = "App::OnStartup";
@@ -291,21 +268,15 @@ namespace Bloxstrap
             if (installLocation is null)
             {
                 Logger.Initialize(true);
-                Logger.WriteLine(LOG_IDENT, "Not installed, launching the installer");
                 LaunchHandler.LaunchInstaller();
             }
             else
             {
                 Paths.Initialize(installLocation);
 
-                Logger.WriteLine(LOG_IDENT, "Entering main logic");
-
                 // ensure executable is in the install directory
                 if (Paths.Process != Paths.Application && !File.Exists(Paths.Application))
-                {
-                    Logger.WriteLine(LOG_IDENT, "Copying to install directory");
                     File.Copy(Paths.Process, Paths.Application);
-                }
 
                 Logger.Initialize(LaunchSettings.UninstallFlag.Active);
 
@@ -330,11 +301,13 @@ namespace Bloxstrap
                 if (!LaunchSettings.BypassUpdateCheck)
                     Installer.HandleUpgrade();
 
+                WindowsRegistry.RegisterApis(); // we want to register those early on
+                                                // so we wont have any issues with bloxshade
+
                 LaunchHandler.ProcessLaunchArgs();
             }
 
             // you must *explicitly* call terminate when everything is done, it won't be called implicitly
-            Logger.WriteLine(LOG_IDENT, "Startup finished");
         }
     }
 }

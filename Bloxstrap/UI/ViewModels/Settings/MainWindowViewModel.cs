@@ -10,11 +10,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand OpenAboutCommand => new RelayCommand(OpenAbout);
         
         public ICommand SaveSettingsCommand => new RelayCommand(SaveSettings);
-        
+
+        public ICommand SaveAndLaunchSettingsCommand => new RelayCommand(SaveAndLaunchSettings);
+
+
         public ICommand CloseWindowCommand => new RelayCommand(CloseWindow);
 
         public EventHandler? RequestSaveNoticeEvent;
-        
+
         public EventHandler? RequestCloseWindowEvent;
 
         public bool TestModeEnabled
@@ -22,12 +25,14 @@ namespace Bloxstrap.UI.ViewModels.Settings
             get => App.LaunchSettings.TestModeFlag.Active;
             set
             {
-                if (value)
+                if (value && !App.State.Prop.TestModeWarningShown)
                 {
                     var result = Frontend.ShowMessageBox(Strings.Menu_TestMode_Prompt, MessageBoxImage.Information, MessageBoxButton.YesNo);
 
                     if (result != MessageBoxResult.Yes)
                         return;
+
+                    App.State.Prop.TestModeWarningShown = true;
                 }
 
                 App.LaunchSettings.TestModeFlag.Active = value;
@@ -60,6 +65,11 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.PendingSettingTasks.Clear();
 
             RequestSaveNoticeEvent?.Invoke(this, EventArgs.Empty);
+        }
+        public void SaveAndLaunchSettings()
+        {
+            SaveSettings();
+            LaunchHandler.LaunchRoblox(LaunchMode.Player);
         }
     }
 }

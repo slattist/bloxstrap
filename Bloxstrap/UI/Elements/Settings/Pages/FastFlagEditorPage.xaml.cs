@@ -20,16 +20,6 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
         // using a datagrid is a codebehind thing only and thats it theres literally no way around it
 
         private readonly ObservableCollection<FastFlag> _fastFlagList = new();
-        private readonly List<string> _validPrefixes = new()
-        {
-            "FFlag", "DFFlag", "SFFlag", "FInt", "DFInt", "FString", "DFString", "FLog", "DFLog"
-        };
-
-        // values must match the entire string to avoid cases where half the string
-        // matches but the filter would still be invalid
-        private readonly Regex _boolFilterPattern = new("^(?:true|false)(;[\\d]{1,})+$", RegexOptions.IgnoreCase);
-        private readonly Regex _intFilterPattern = new("^([\\d]{1,})?(;[\\d]{1,})+$", RegexOptions.IgnoreCase);
-        private readonly Regex _stringFilterPattern = new("^[^;]*(;[\\d]{1,})+$", RegexOptions.IgnoreCase);
 
         private bool _showPresets = false;
         private string _searchFilter = "";
@@ -109,18 +99,33 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
                 ImportJSON(dialog.JsonTextBox.Text);
         }
 
+        private void ShowProfilesDialog()
+        {
+            var dialog = new FlagProfilesDialog();
+            dialog.ShowDialog();
+
+            if (dialog.Result != MessageBoxResult.OK)
+                return;
+
+            if (dialog.Tabs.SelectedIndex == 0)
+                App.FastFlags.SaveProfile(dialog.SaveProfile.Text);
+            else if (dialog.Tabs.SelectedIndex == 1)
+            {
+                if (dialog.LoadProfile.SelectedValue == null)
+                    return;
+                App.FastFlags.LoadProfile(dialog.LoadProfile.SelectedValue.ToString(), dialog.ClearFlags.IsChecked);
+            }
+
+            Thread.Sleep(1000);
+            ReloadList();
+        }
+
         private void AddSingle(string name, string value)
         {
             FastFlag? entry;
 
             if (App.FastFlags.GetValue(name) is null)
             {
-                if (!ValidateFlagEntry(name, value))
-                {
-                    ShowAddDialog();
-                    return;
-                }
-
                 entry = new FastFlag
                 {
                     // Enabled = true,
@@ -255,51 +260,10 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
                 if (val is null)
                     continue;
 
-                if (!ValidateFlagEntry(pair.Key, val))
-                    continue;
-
                 App.FastFlags.SetValue(pair.Key, pair.Value);
             }
 
             ClearSearch();
-        }
-
-        private bool ValidateFlagEntry(string name, string value)
-        {
-            string lowerValue = value.ToLowerInvariant();
-            string errorMessage = "";
-
-            if (!_validPrefixes.Any(name.StartsWith))
-                errorMessage = Strings.Menu_FastFlagEditor_InvalidPrefix;
-            else if (!name.All(x => char.IsLetterOrDigit(x) || x == '_'))
-                errorMessage = Strings.Menu_FastFlagEditor_InvalidCharacter;
-            
-            if (name.EndsWith("_PlaceFilter") || name.EndsWith("_DataCenterFilter"))
-                errorMessage = !ValidateFilter(name, value) ? Strings.Menu_FastFlagEditor_InvalidPlaceFilter : ""; 
-            else if ((name.StartsWith("FInt") || name.StartsWith("DFInt")) && !Int32.TryParse(value, out _))
-                errorMessage = Strings.Menu_FastFlagEditor_InvalidNumberValue;
-            else if ((name.StartsWith("FFlag") || name.StartsWith("DFFlag")) && lowerValue != "true" && lowerValue != "false")
-                errorMessage = Strings.Menu_FastFlagEditor_InvalidBoolValue;
-            
-            if (!String.IsNullOrEmpty(errorMessage))
-            { 
-                Frontend.ShowMessageBox(String.Format(errorMessage, name), MessageBoxImage.Error);
-                return false;
-            }
-
-            return true;
-        }
-
-        private bool ValidateFilter(string name, string value)
-        {
-            if(name.StartsWith("FFlag") || name.StartsWith("DFFlag"))
-                return _boolFilterPattern.IsMatch(value);
-            if (name.StartsWith("FInt") || name.StartsWith("DFInt"))
-                return _intFilterPattern.IsMatch(value);
-            if (name.StartsWith("FString") || name.StartsWith("DFString") || name.StartsWith("FLog") || name.StartsWith("DFLog"))
-                return _stringFilterPattern.IsMatch(value);
-            
-            return false;
         }
 
         // refresh list on page load to synchronize with preset page
@@ -344,13 +308,6 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
                     string oldValue = entry.Value;
                     string newValue = textbox.Text;
 
-                    if (!ValidateFlagEntry(entry.Name, newValue))
-                    {
-                        e.Cancel = true;
-                        textbox.Text = oldValue;
-                        return;
-                    }
-
                     App.FastFlags.SetValue(entry.Name, newValue);
 
                     break;
@@ -364,6 +321,8 @@ namespace Bloxstrap.UI.Elements.Settings.Pages
         }
 
         private void AddButton_Click(object sender, RoutedEventArgs e) => ShowAddDialog();
+
+        private void FlagProfiles_Click(object sender, RoutedEventArgs e) => ShowProfilesDialog();
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
